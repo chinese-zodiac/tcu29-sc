@@ -27,6 +27,10 @@ library IterableArrayWithoutDuplicateKeys {
         return map.keys[index];
     }
 
+    function has(Map storage map, address key) public view returns (bool) {
+        return map.inserted[key];
+    }
+
     function size(Map storage map) public view returns (uint256) {
         return map.keys.length;
     }
