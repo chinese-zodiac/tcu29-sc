@@ -2,6 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ERC20Burnable} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {AccessControlEnumerable} from "@openzeppelin/contracts/access/extensions/AccessControlEnumerable.sol";
@@ -11,10 +12,12 @@ import {ICzusdGate} from "./interfaces/ICzusdGate.sol";
 contract TCu29Sale is AccessControlEnumerable, Pausable {
     using IterableArrayWithoutDuplicateKeys for IterableArrayWithoutDuplicateKeys.Map;
     using SafeERC20 for IERC20;
+    using SafeERC20 for ERC20Burnable;
 
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
 
-    IERC20 public czusd = IERC20(0xE68b79e51bf826534Ff37AA9CeE71a3842ee9c70);
+    ERC20Burnable public czusd =
+        ERC20Burnable(0xE68b79e51bf826534Ff37AA9CeE71a3842ee9c70);
     IERC20 public usdt = IERC20(0x55d398326f99059fF775485246999027B3197955);
     IERC20 public tcu29 = IERC20(0x8fEEdfcdd4264EA97d1656F20E162D8336926482);
     ICzusdGate public czusdGate =
@@ -27,6 +30,7 @@ contract TCu29Sale is AccessControlEnumerable, Pausable {
 
     uint256 public totalCzusdDistributed;
     uint256 public totalTcu29Sold;
+    uint256 public totalCzusdBurned;
 
     uint32 public price = 4200; //Price in thousandths (eg: 8346 = 8.346 means 1 TCu29 = 8.346 CZUSD)
 
@@ -46,32 +50,34 @@ contract TCu29Sale is AccessControlEnumerable, Pausable {
         uint256 amtUsdt,
         address recipient
     ) external whenNotPaused {
-        require(amtUsdt <= buyCap, "Cannot exceed buyCap");
         uint256 initialCzusdBal = czusd.balanceOf(address(this));
         usdt.safeTransferFrom(msg.sender, address(this), amtUsdt);
         usdt.approve(address(czusdGate), amtUsdt);
         czusdGate.usdtIn(amtUsdt, address(this));
         uint256 czusdReceived = czusd.balanceOf(address(this)) -
             initialCzusdBal;
-        uint256 tcu29Purchased = (czusdReceived * 1000) / price;
-        tcu29.safeTransfer(recipient, tcu29Purchased);
-        totalCzusdDistributed += czusdReceived;
-        totalTcu29Sold += tcu29Purchased;
+        _handleSale(czusdReceived, recipient);
     }
 
     function buyTCu29Czusd(
         uint256 amtCzusd,
         address recipient
     ) external whenNotPaused {
-        require(amtCzusd <= buyCap, "Cannot exceed buyCap");
         uint256 initialCzusdBal = czusd.balanceOf(address(this));
         czusd.safeTransferFrom(msg.sender, address(this), amtCzusd);
         uint256 czusdReceived = czusd.balanceOf(address(this)) -
             initialCzusdBal;
+        _handleSale(czusdReceived, recipient);
+    }
+
+    function _handleSale(uint256 czusdReceived, address recipient) internal {
+        require(czusdReceived <= buyCap, "Cannot exceed buyCap");
         uint256 tcu29Purchased = (czusdReceived * 1000) / price;
         tcu29.safeTransfer(recipient, tcu29Purchased);
-        totalCzusdDistributed += czusdReceived;
         totalTcu29Sold += tcu29Purchased;
+        uint256 toBurn = (czusdReceived * saleBurnBasis) / 10000;
+        czusd.burn(toBurn);
+        totalCzusdBurned += toBurn;
     }
 
     function managerTcu29Deposit(uint256 amt) external onlyRole(MANAGER_ROLE) {
@@ -128,6 +134,7 @@ contract TCu29Sale is AccessControlEnumerable, Pausable {
                 (weight * toSend) / saleRecipientWeightTotal
             );
         }
+        totalCzusdDistributed += (toSend - czusd.balanceOf(address(this)));
     }
 
     function managerUnpause() external onlyRole(MANAGER_ROLE) {
@@ -158,7 +165,9 @@ contract TCu29Sale is AccessControlEnumerable, Pausable {
         buyCap = to;
     }
 
-    function adminSetCzusd(IERC20 to) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function adminSetCzusd(
+        ERC20Burnable to
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         czusd = to;
     }
 
