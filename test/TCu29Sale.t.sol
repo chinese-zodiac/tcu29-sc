@@ -22,6 +22,7 @@ contract TCu29SaleTest is Test {
         users.push(makeAddr("user1"));
         users.push(makeAddr("user2"));
         users.push(makeAddr("user3"));
+        users.push(makeAddr("user4"));
 
         czusd = new ERC20BurnableMock();
         usdt = new ERC20Mock();
@@ -52,6 +53,15 @@ contract TCu29SaleTest is Test {
         assertEq(tcu29.balanceOf(users[2]), 1 ether);
         assertEq(tcu29.balanceOf(users[3]), 4 ether);
         assertEq(czusd.balanceOf(users[1]), 1_000 ether - 2.5 ether - 10 ether);
+        assertEq(sale.totalTcu29Sold(), 5 ether);
+        assertEq(sale.totalCzusdDistributed(), 0 ether);
+        uint256 expectedBurn = (12.5 ether * 750) / 10000;
+        assertEq(expectedBurn, 0.9375 ether);
+        assertEq(sale.totalCzusdBurned(), expectedBurn);
+        assertEq(
+            czusd.balanceOf(address(sale)),
+            10 ether + 2.5 ether - expectedBurn
+        );
     }
 
     function testBuyTCu29Usdt() public {
@@ -67,5 +77,54 @@ contract TCu29SaleTest is Test {
         assertEq(tcu29.balanceOf(users[2]), 1 ether);
         assertEq(tcu29.balanceOf(users[3]), 4 ether);
         assertEq(usdt.balanceOf(users[1]), 1_000 ether - 2.5 ether - 10 ether);
+        assertEq(sale.totalTcu29Sold(), 5 ether);
+        assertEq(sale.totalCzusdDistributed(), 0 ether);
+        uint256 expectedBurn = (12.5 ether * 750) / 10000;
+        assertEq(expectedBurn, 0.9375 ether);
+        assertEq(sale.totalCzusdBurned(), expectedBurn);
+        assertEq(
+            czusd.balanceOf(address(sale)),
+            10 ether + 2.5 ether - expectedBurn
+        );
+    }
+
+    function testSaleRecipients() public {
+        vm.startPrank(users[0]);
+        sale.managerSaleRecipientAdd(users[1], 100);
+        sale.managerSaleRecipientAdd(users[2], 100);
+        sale.managerSaleRecipientAdd(users[3], 100);
+        sale.managerSaleRecipientDelete(users[2]);
+        sale.managerSaleRecipientAdd(users[4], 300);
+        sale.managerSaleRecipientSet(users[3], 50);
+        vm.stopPrank();
+
+        assertEq(sale.saleRecipientWeightTotal(), 450);
+        assertEq(sale.saleRecipientWeight(users[1]), 100);
+        assertEq(sale.saleRecipientWeight(users[2]), 0);
+        assertEq(sale.saleRecipientWeight(users[3]), 50);
+        assertEq(sale.saleRecipientWeight(users[4]), 300);
+        assertEq(sale.saleRecipientsCount(), 3);
+
+        tcu29.mint(address(sale), 1_000 ether);
+        czusd.mint(users[0], 1_000 ether);
+
+        vm.startPrank(users[0]);
+        czusd.approve(address(sale), type(uint256).max);
+        sale.buyTCu29Czusd(2.5 ether, users[2]);
+        sale.buyTCu29Czusd(10 ether, users[3]);
+        vm.stopPrank();
+
+        uint256 expectedToDistribute = czusd.balanceOf(address(sale));
+
+        vm.prank(users[0]);
+        sale.managerDistributeCzusd();
+
+        assertEq(sale.totalCzusdDistributed(), 12.5 ether - 0.9375 ether - 1);
+        assertEq(sale.totalCzusdDistributed(), expectedToDistribute - 1);
+
+        assertEq(czusd.balanceOf(users[1]), (expectedToDistribute * 100) / 450);
+        assertEq(czusd.balanceOf(users[2]), 0);
+        assertEq(czusd.balanceOf(users[3]), (expectedToDistribute * 50) / 450);
+        assertEq(czusd.balanceOf(users[4]), (expectedToDistribute * 300) / 450);
     }
 }
