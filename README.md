@@ -4,7 +4,7 @@ Allows purchase of TCu29 up to $10,000 in one transaction, with no slippage.
 
 ## Official Deployments
 
-BSC:0xC324C1f146713b2d6ae6EcCa2DD4288c84D8018b
+BSC:0x6AEEe36069b881B536cA7d9761353ec2c2405B03
 
 ## deployment
 

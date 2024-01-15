@@ -19,7 +19,7 @@ contract TCu29Sale is AccessControlEnumerable, Pausable {
     ERC20Burnable public czusd =
         ERC20Burnable(0xE68b79e51bf826534Ff37AA9CeE71a3842ee9c70);
     IERC20 public usdt = IERC20(0x55d398326f99059fF775485246999027B3197955);
-    IERC20 public tcu29 = IERC20(0x8fEEdfcdd4264EA97d1656F20E162D8336926482);
+    IERC20 public tcu29 = IERC20(0x5b0B5c848a843c83c20dcfa25CDe6E122898a614);
     ICzusdGate public czusdGate =
         ICzusdGate(0xeB7aaB426902A59722D1EC22314d770b1aEBFeBC);
 
