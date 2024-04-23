@@ -5,6 +5,7 @@ pragma solidity ^0.8.23;
 import {AccessControlEnumerable} from "@openzeppelin/contracts/access/extensions/AccessControlEnumerable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {Tcu29Pool} from "./Tcu29Pool.sol";
 import {Tcu29PoolStakeWrapperToken} from "./Tcu29PoolStakeWrapperToken.sol";
@@ -31,20 +32,22 @@ contract Tcu29PoolMaster is AccessControlEnumerable {
     uint256 public totalWeight;
 
     constructor() {
-        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
-    function isDistributeReady() external {
-        return (czusd.balanceOf(address(this)) >= 1 ether &&
-            block.timestamp - lastDistribution >= distributionPeriod);
+    function isDistributeReady() public view returns (bool) {
+        return
+            (czusd.balanceOf(address(this)) >= 1 ether) &&
+            (block.timestamp - lastDistribution >= distributionPeriod);
     }
 
     function distribute() external {
         require(isDistributeReady());
+        uint256 czusdWad = czusd.balanceOf(address(this));
         for (uint256 i = 0; i < tcu29Pools.size(); i++) {
             address pool = tcu29Pools.getKeyAtIndex(i);
             if (weights[pool] != 0) {
-                uint256 rewardsWad = (_czusdWad * weights[pool]) / totalWeight;
+                uint256 rewardsWad = (czusdWad * weights[pool]) / totalWeight;
                 czusd.approve(pool, rewardsWad);
                 Tcu29Pool(pool).addRewardsWithCzusd(rewardsWad);
             }
@@ -72,7 +75,7 @@ contract Tcu29PoolMaster is AccessControlEnumerable {
     }
 
     function addTcu29Pool(
-        ERC20 _tribeToken,
+        IERC20Metadata _tribeToken,
         bool _isLrtWhitelist,
         uint256 _weight,
         address _owner
@@ -88,7 +91,7 @@ contract Tcu29PoolMaster is AccessControlEnumerable {
         Tcu29PoolStakeWrapperToken poolWrapper = new Tcu29PoolStakeWrapperToken(
             poolWrapperName, //string memory _name,
             poolWrapperName, //string memory _symbol,
-            tcu29CzusdLp, //address _underlying,
+            address(tcu29CzusdLp), //address _underlying,
             address(_tribeToken), //address _tribeToken,
             _isLrtWhitelist, //bool _isLrtWhitelist
             _owner,
