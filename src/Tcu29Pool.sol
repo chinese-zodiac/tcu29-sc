@@ -34,7 +34,7 @@ contract Tcu29Pool is Ownable {
     // The precision factor
     uint256 public PRECISION_FACTOR = 10 ** 12;
 
-    uint256 public period = 180 days;
+    uint256 public period = 30 days;
 
     address public tcu29PoolMaster;
 

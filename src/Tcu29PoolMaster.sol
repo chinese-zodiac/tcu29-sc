@@ -9,7 +9,7 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {Tcu29Pool} from "./Tcu29Pool.sol";
 import {Tcu29PoolStakeWrapperToken} from "./Tcu29PoolStakeWrapperToken.sol";
-import "./lib/IterableArrayWithoutDuplicateKeys.sol";
+import {IterableArrayWithoutDuplicateKeys} from "./lib/IterableArrayWithoutDuplicateKeys.sol";
 
 //import "hardhat/console.sol";
 
@@ -19,7 +19,7 @@ contract Tcu29PoolMaster is AccessControlEnumerable {
     using Strings for uint256;
 
     uint256 public lastDistribution;
-    uint256 public distributionPeriod = 3 days;
+    uint256 public distributionPeriod = 30 days;
 
     bytes32 public constant MANAGER_POOLS = keccak256("MANAGER_POOLS");
 
@@ -27,12 +27,13 @@ contract Tcu29PoolMaster is AccessControlEnumerable {
     IERC20 public tcu29CzusdLp =
         IERC20(0x52950E1043A708483988B935F053518C6cD1dF6c);
 
-    IterableArrayWithoutDuplicateKeys.Map tcu29Pools;
+    IterableArrayWithoutDuplicateKeys.Map private tcu29Pools;
     mapping(address pool => uint256 weight) public weights;
     uint256 public totalWeight;
 
-    constructor() {
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+    constructor(address _admin, address _manager) {
+        _grantRole(MANAGER_POOLS, _admin);
+        _grantRole(DEFAULT_ADMIN_ROLE, _manager);
     }
 
     function isDistributeReady() public view returns (bool) {
@@ -42,7 +43,6 @@ contract Tcu29PoolMaster is AccessControlEnumerable {
     }
 
     function distribute() external {
-        require(isDistributeReady());
         uint256 czusdWad = czusd.balanceOf(address(this));
         for (uint256 i = 0; i < tcu29Pools.size(); i++) {
             address pool = tcu29Pools.getKeyAtIndex(i);
