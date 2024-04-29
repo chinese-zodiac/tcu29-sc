@@ -10,10 +10,13 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {Tcu29Pool} from "./Tcu29Pool.sol";
 import {Tcu29PoolStakeWrapperToken} from "./Tcu29PoolStakeWrapperToken.sol";
 import {IterableArrayWithoutDuplicateKeys} from "./lib/IterableArrayWithoutDuplicateKeys.sol";
-
+import {AutomationCompatibleInterface} from "./interfaces/AutomationCompatibleInterface.sol";
 //import "hardhat/console.sol";
 
-contract Tcu29PoolMaster is AccessControlEnumerable {
+contract Tcu29PoolMaster is
+    AccessControlEnumerable,
+    AutomationCompatibleInterface
+{
     using IterableArrayWithoutDuplicateKeys for IterableArrayWithoutDuplicateKeys.Map;
     using SafeERC20 for IERC20;
     using Strings for uint256;
@@ -36,13 +39,23 @@ contract Tcu29PoolMaster is AccessControlEnumerable {
         _grantRole(DEFAULT_ADMIN_ROLE, _manager);
     }
 
+    function checkUpkeep(
+        bytes calldata
+    ) external view returns (bool upkeepNeeded, bytes memory) {
+        upkeepNeeded = isDistributeReady();
+    }
+
+    function performUpkeep(bytes calldata) external {
+        distribute();
+    }
+
     function isDistributeReady() public view returns (bool) {
         return
-            (czusd.balanceOf(address(this)) >= 1 ether) &&
+            (czusd.balanceOf(address(this)) >= 100 ether) &&
             (block.timestamp - lastDistribution >= distributionPeriod);
     }
 
-    function distribute() external {
+    function distribute() public {
         uint256 czusdWad = czusd.balanceOf(address(this));
         for (uint256 i = 0; i < tcu29Pools.size(); i++) {
             address pool = tcu29Pools.getKeyAtIndex(i);
@@ -74,7 +87,7 @@ contract Tcu29PoolMaster is AccessControlEnumerable {
         return tcu29Pools.size();
     }
 
-    function addTcu29Pool(
+    function addTcu29LpPool(
         IERC20Metadata _tribeToken,
         bool _isLrtWhitelist,
         uint256 _weight,
